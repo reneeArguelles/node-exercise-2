@@ -10,13 +10,53 @@ class BioObject {
     this.height = Number(bioHeight)
     this.weight = Number(bioWeight)
   }
+
+  iisValidName() {
+    if (!(typeof this.name === 'string')) {
+      console.log('Invalid name.')
+      process.exit(1)
+    }
+    return true
+  }
+
+  isValidSex() {
+    if (!['F', 'M'].includes(this.sex)) {
+      console.log('Incorrect sex.')
+      process.exit(1)
+    }
+    return true
+  }
+
+  isValidAge() {
+    if (Number.isNaN(this.age) || this.age < 18) {
+      console.log('Invalid age. Must be a number and greater than 18.')
+      process.exit(1)
+    }
+    return true
+  }
+
+  isValidHeight() {
+    if (Number.isNaN(this.height)) {
+      console.log('Invalid height. Must be a number.')
+      process.exit(1)
+    }
+    return true
+  }
+
+  isValidWeight() {
+    if (Number.isNaN(this.weight)) {
+      console.log('Invalid weight. Must be a number.')
+      process.exit(1)
+    }
+    return true
+  }
 }
 
 const readCSV = (filePath) => csvjson.toObject(readFileSync(filePath, 'utf-8'), { delimiter: ',', quote: '"' })
 
-const writeToCSV = (filePath, bioArray) => {
+const writeToCSV = (filePath, bioMap) => {
   try {
-    writeFileSync(filePath, csvjson.toCSV(bioArray, { headers: 'key', delimiter: ',\t\t' }))
+    writeFileSync(filePath, csvjson.toCSV(Array.from(bioMap.values()), { headers: 'key', delimiter: ',\t\t' }))
     return true
   } catch (error) {
     return false
@@ -24,65 +64,57 @@ const writeToCSV = (filePath, bioArray) => {
 }
 
 const createBioObject = (bioName, bioSex, bioAge, bioHeight, bioWeight) => {
-  if (!['f', 'm', 'F', 'M'].includes(bioSex)) {
-    console.log('Incorrect sex.')
-    process.exit(1)
+  const newBio = new BioObject(bioName, bioSex, bioAge, bioHeight, bioWeight)
+
+  if (newBio.iisValidName() && newBio.isValidSex() && newBio.isValidAge()
+    && newBio.isValidHeight() && newBio.isValidWeight()) {
+    return newBio
   }
-  if (Number.isNaN(Number(bioAge)) || bioAge < 18) {
-    console.log('Invalid age. Must be a number and greater than 18.')
-    process.exit(1)
-  }
-  if (Number.isNaN(Number(bioHeight))) {
-    console.log('Invalid height. Must be a number.')
-    process.exit(1)
-  }
-  if (Number.isNaN(Number(bioWeight))) {
-    console.log('Invalid weight. Must be a number.')
-    process.exit(1)
-  }
-  return new BioObject(bioName, bioSex, bioAge, bioHeight, bioWeight)
+  return null
 }
 
-const readBio = (bioArray, bioName) => bioArray.find((obj) => obj.name.toLowerCase() === bioName.toLowerCase())
+const readBio = (bioMap, bioName) => bioMap.get(`${bioName[0].toUpperCase() + bioName.substring(1).toLowerCase()}`)
 
-const createBio = (bioArray, newBioObject) => [...bioArray, newBioObject]
+const createBio = (bioMap, newBioObject) => bioMap.set(newBioObject.name, newBioObject)
 
-const updateBio = (bioArray, updatedBioObject) => {
-  bioArray.splice(bioArray.indexOf(readBio(bioArray, updatedBioObject.name)), 1, updatedBioObject)
+const updateBio = (bioMap, updatedBio) => bioMap.set(updatedBio.name, updatedBio)
+
+const deleteBio = (bioMap, bioName) => bioMap.delete(bioName)
+
+const arrayToMap = (array) => new Map(array.map((item) => [item.name, item]))
+
+const checkIfExisting = (bioMap, bioName, command) => {
+  const existing = bioMap.has(bioName[0].toUpperCase() + bioName.substring(1).toLowerCase())
+
+  if (command === '-c' && existing) {
+    console.log('No duplicates allowed. Data already exists.')
+    process.exit(1)
+  } else if (command === '-u' && !existing) {
+    console.log('Data does not exist.')
+    process.exit(1)
+  } else if (command === '-d' && !existing) {
+    console.log(`Person with name '${argv.name}' does not exist in the database.`)
+    process.exit(1)
+  }
 }
 
-const deleteBio = (bioArray, bioName) => {
-  bioArray.splice(bioArray.indexOf(readBio(bioArray, bioName)), 1)
+const saveAndExit = (dbPath, bioMap) => {
+  console.log(writeToCSV(dbPath, bioMap))
+  process.exit(1)
 }
 
 const dbPath = 'biostats.csv'
-const origBioArray = readCSV(dbPath)
+const bioMap = arrayToMap(readCSV(dbPath))
 
 if (!(argv.c || argv.r || argv.u || argv.d)) {
   console.log('Invalid option. Must be in [-c, -r, -u, -d].')
   process.exit(1)
 } else if (argv.c) {
-  if (argv.name === undefined || argv.sex === undefined || argv.age === undefined
-    || argv.height === undefined || argv.weight === undefined) {
-    console.log('Incomplete arguments. Must contain <name> <sex> <age> <height> <weight>.')
-    process.exit(1)
-  }
-  if (readBio(origBioArray, argv.name)) {
-    console.log('No duplicates allowed. Data already exists.')
-    process.exit(1)
-  }
-  const newBioArray = createBio(
-    origBioArray,
-    createBioObject(argv.name, argv.sex, argv.age, argv.height, argv.weight),
-  )
-  console.log(writeToCSV(dbPath, newBioArray))
-  process.exit(1)
+  checkIfExisting(bioMap, argv.name, '-c')
+  createBio(bioMap, createBioObject(argv.name, argv.sex, argv.age, argv.height, argv.weight))
+  saveAndExit()
 } else if (argv.r) {
-  if (argv.name === undefined) {
-    console.log('Missing <name> argument.')
-    process.exit(1)
-  }
-  const person = readBio(origBioArray, argv.name)
+  const person = readBio(bioMap, argv.name)
   if (!person) {
     console.log('Data not found.')
     process.exit(1)
@@ -97,25 +129,11 @@ if (!(argv.c || argv.r || argv.u || argv.d)) {
     process.exit(1)
   }
 } else if (argv.u) {
-  if (argv.name === undefined || argv.sex === undefined || argv.age === undefined
-    || argv.height === undefined || argv.weight === undefined) {
-    console.log('Incomplete arguments. Must contain <name> <sex> <age> <height> <weight>')
-    process.exit(1)
-  }
-  if (readBio(origBioArray, argv.name) === undefined) {
-    console.log('Data does not exist.')
-    process.exit(1)
-  }
-  updateBio(origBioArray, createBioObject(argv.name, argv.sex, argv.age, argv.height, argv.weight))
-  console.log(writeToCSV(dbPath, origBioArray))
-  process.exit(1)
+  checkIfExisting(bioMap, argv.name, '-u')
+  updateBio(bioMap, createBioObject(argv.name, argv.sex, argv.age, argv.height, argv.weight))
+  saveAndExit()
 } else if (argv.d) {
-  if (!(readBio(origBioArray, argv.name))) {
-    console.log(`Person with name '${argv.name}' does not exist in the database.`)
-    process.exit(1)
-  } else {
-    deleteBio(origBioArray, argv.name)
-    console.log(writeToCSV(dbPath, origBioArray))
-    process.exit(1)
-  }
+  checkIfExisting(bioMap, argv.name, '-d')
+  deleteBio(bioMap, argv.name)
+  saveAndExit()
 }
