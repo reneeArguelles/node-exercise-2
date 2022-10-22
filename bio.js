@@ -79,7 +79,7 @@ const createBio = (bioMap, newBioObject) => bioMap.set(newBioObject.name, newBio
 
 const updateBio = (bioMap, updatedBio) => bioMap.set(updatedBio.name, updatedBio)
 
-const deleteBio = (bioMap, bioName) => bioMap.delete(bioName)
+const deleteBio = (bioMap, bioName) => bioMap.delete(`${bioName[0].toUpperCase() + bioName.substring(1).toLowerCase()}`)
 
 const arrayToMap = (array) => new Map(array.map((item) => [item.name, item]))
 
@@ -112,7 +112,7 @@ if (!(argv.c || argv.r || argv.u || argv.d)) {
 } else if (argv.c) {
   checkIfExisting(bioMap, argv.name, '-c')
   createBio(bioMap, createBioObject(argv.name, argv.sex, argv.age, argv.height, argv.weight))
-  saveAndExit()
+  saveAndExit(dbPath, bioMap)
 } else if (argv.r) {
   const person = readBio(bioMap, argv.name)
   if (!person) {
@@ -131,9 +131,9 @@ if (!(argv.c || argv.r || argv.u || argv.d)) {
 } else if (argv.u) {
   checkIfExisting(bioMap, argv.name, '-u')
   updateBio(bioMap, createBioObject(argv.name, argv.sex, argv.age, argv.height, argv.weight))
-  saveAndExit()
+  saveAndExit(dbPath, bioMap)
 } else if (argv.d) {
   checkIfExisting(bioMap, argv.name, '-d')
   deleteBio(bioMap, argv.name)
-  saveAndExit()
+  saveAndExit(dbPath, bioMap)
 }
